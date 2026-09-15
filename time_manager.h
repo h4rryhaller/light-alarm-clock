@@ -12,6 +12,10 @@ bool isTimeSynced();
 // sincronización (outTime queda sin definir en ese caso).
 bool getLocalTime(struct tm &outTime);
 
+// Fija la hora manualmente (fallback sin NTP, vía /api/time). Marca
+// isTimeSynced() como true a partir de este punto.
+void setManualTime(const struct tm &newTime);
+
 // Segundos que faltan hasta la próxima ocurrencia de hour:minute (0 si ya
 // ha pasado hoy, se calcula para mañana). Devuelve -1 si no hay hora sincronizada.
 long secondsUntilAlarm(uint8_t hour, uint8_t minute);

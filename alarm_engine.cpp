@@ -19,6 +19,12 @@ static unsigned long snoozeUntilMs = 0;
 static unsigned long lastBuzzEscalationMs = 0;
 static uint8_t buzzEscalationCount = 0;
 
+// Instante (epoch) de la ocurrencia de alarma que armó WAKE_RAMP. Se fija una
+// sola vez al entrar y no se recalcula en cada tick — secondsUntilAlarm()
+// salta al día siguiente en cuanto la hora objetivo pasa, así que usarla
+// dentro de WAKE_RAMP/WAKE_BUZZ_ESCALATION nunca deja ver secs<=0.
+static time_t wakeTargetEpoch = 0;
+
 static unsigned long minutesToMs(uint16_t minutes) {
   return static_cast<unsigned long>(minutes) * 60000UL;
 }
@@ -33,6 +39,16 @@ static void enterWakeRamp() {
   state = AlarmState::WAKE_RAMP;
   buzzEscalationCount = 0;
   lastBuzzEscalationMs = millis();
+
+  struct tm nowTm;
+  getLocalTime(nowTm); // checkAutoWakeTrigger ya comprobó que hay hora sincronizada
+  struct tm target = nowTm;
+  target.tm_hour = settings.alarm.hour;
+  target.tm_min = settings.alarm.minute;
+  target.tm_sec = 0;
+  wakeTargetEpoch = mktime(&target);
+  if (wakeTargetEpoch < mktime(&nowTm)) wakeTargetEpoch += 24 * 3600;
+
   setLedIntensity(settings.wake.color, 0);
   startFade(settings.wake.color, 100, settings.wake.cadenceMs, settings.wake.stepPercent);
 }
@@ -129,21 +145,23 @@ void alarmEngineTick() {
       break;
 
     case AlarmState::SLEEP_MODE:
+      checkAutoWakeTrigger(); // la alarma debe poder interrumpir el modo dormir
+      if (state != AlarmState::SLEEP_MODE) break; // se interrumpió: ya está en WAKE_RAMP
       if (millis() - sleepStartMs >= minutesToMs(settings.sleep.durationMin)) {
         enterIdle();
       }
       break;
 
     case AlarmState::WAKE_RAMP: {
-      long secs = secondsUntilAlarm(settings.alarm.hour, settings.alarm.minute);
-      if (secs >= 0 && secs <= static_cast<long>(settings.wake.buzzLeadTimeMin) * 60) {
+      double secs = difftime(wakeTargetEpoch, time(nullptr));
+      if (secs <= static_cast<double>(settings.wake.buzzLeadTimeMin) * 60) {
         enterBuzzEscalation();
       }
       break;
     }
 
     case AlarmState::WAKE_BUZZ_ESCALATION: {
-      long secs = secondsUntilAlarm(settings.alarm.hour, settings.alarm.minute);
+      double secs = difftime(wakeTargetEpoch, time(nullptr));
       if (secs <= 0) {
         enterAlarmActive();
       } else {

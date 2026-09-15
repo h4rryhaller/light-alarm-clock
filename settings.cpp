@@ -18,13 +18,17 @@ void applyDefaults(Settings &s) {
 
   s.sleep.color = {255, 140, 20};
   s.sleep.startIntensity = 100;
-  s.sleep.cadenceMs = 2000;
-  s.sleep.stepPercent = 2;
+  // 1% cada 18s = 100 pasos en 1800s (30min) -> el fundido dura justo durationMin,
+  // en vez de completarse en ~100s y quedarse el resto del tiempo sin cambiar.
+  s.sleep.cadenceMs = 18000;
+  s.sleep.stepPercent = 1;
   s.sleep.durationMin = 30;
 
   s.wake.color = {255, 200, 100};
-  s.wake.cadenceMs = 2000;
-  s.wake.stepPercent = 2;
+  // 1% cada 24s = 100 pasos en 2400s (40min) -> coincide con leadTimeMin-buzzLeadTimeMin
+  // (60-20), la ventana real de WAKE_RAMP antes de pasar a la escalada de buzzer.
+  s.wake.cadenceMs = 24000;
+  s.wake.stepPercent = 1;
   s.wake.leadTimeMin = 60;
   s.wake.buzzLeadTimeMin = 20;
   s.wake.buzzIntervalMin = 5;
@@ -38,7 +42,7 @@ void applyDefaults(Settings &s) {
   s.wake.snoozeDurationMin = 5;
   s.wake.maxRingDurationMin = 30;
 
-  s.presence.thresholdCm = 15;
+  s.presence.thresholdCm = 20;
   s.presence.pollIntervalMs = 150;
   s.presence.displayTimeoutMs = 5000;
 
@@ -46,13 +50,13 @@ void applyDefaults(Settings &s) {
   strlcpy(s.network.apName, DEFAULT_AP_NAME, sizeof(s.network.apName));
 }
 
-static void colorFromJson(JsonObjectConst obj, RGBColor &out) {
+void colorFromJson(JsonObjectConst obj, RGBColor &out) {
   out.r = obj["r"] | out.r;
   out.g = obj["g"] | out.g;
   out.b = obj["b"] | out.b;
 }
 
-static void colorToJson(JsonObject obj, const RGBColor &color) {
+void colorToJson(JsonObject obj, const RGBColor &color) {
   obj["r"] = color.r;
   obj["g"] = color.g;
   obj["b"] = color.b;
@@ -141,9 +145,7 @@ bool loadSettings(Settings &s) {
   return true;
 }
 
-bool saveSettings(const Settings &s) {
-  JsonDocument doc;
-
+void settingsToJson(const Settings &s, JsonDocument &doc) {
   doc["version"] = s.version;
 
   JsonObject time = doc["time"].to<JsonObject>();
@@ -189,6 +191,11 @@ bool saveSettings(const Settings &s) {
   JsonObject network = doc["network"].to<JsonObject>();
   network["hostname"] = s.network.hostname;
   network["apName"] = s.network.apName;
+}
+
+bool saveSettings(const Settings &s) {
+  JsonDocument doc;
+  settingsToJson(s, doc);
 
   File file = LittleFS.open(SETTINGS_FILE_PATH, "w");
   if (!file) {

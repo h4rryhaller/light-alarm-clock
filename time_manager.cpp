@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <sys/time.h>
 #include "time_manager.h"
 
 static bool timeSynced = false;
@@ -21,6 +22,14 @@ bool getLocalTime(struct tm &outTime) {
   time_t now = time(nullptr);
   localtime_r(&now, &outTime);
   return true;
+}
+
+void setManualTime(const struct tm &newTime) {
+  struct tm copy = newTime;
+  time_t epoch = mktime(&copy); // usa el TZ ya fijado por initTime()
+  struct timeval tv = {epoch, 0};
+  settimeofday(&tv, nullptr);
+  timeSynced = true;
 }
 
 long secondsUntilAlarm(uint8_t hour, uint8_t minute) {

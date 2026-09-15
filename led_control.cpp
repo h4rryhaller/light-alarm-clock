@@ -29,6 +29,9 @@ static void writeColor(const RGBColor &color, uint8_t intensityPercent) {
 }
 
 void setupLed() {
+  // Sin esto, analogWrite() usa el rango por defecto del core (0-1023) y los
+  // valores de color 0-255 del resto del código solo llegan a ~25% de duty.
+  analogWriteRange(255);
   pinMode(PIN_LED_R, OUTPUT);
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);

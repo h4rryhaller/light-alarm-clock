@@ -2,6 +2,7 @@
 #define SETTINGS_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 struct RGBColor {
   uint8_t r;
@@ -75,5 +76,12 @@ void applyDefaults(Settings &s);
 // Si falta o no parsea, aplica defaults y guarda inmediatamente.
 bool loadSettings(Settings &s);
 bool saveSettings(const Settings &s);
+
+// Compartidos con web_api.cpp para no duplicar el (de)serializado de colores
+// ni el volcado completo a JSON (usado tanto por saveSettings como por
+// GET /api/settings).
+void colorFromJson(JsonObjectConst obj, RGBColor &out);
+void colorToJson(JsonObject obj, const RGBColor &color);
+void settingsToJson(const Settings &s, JsonDocument &doc);
 
 #endif

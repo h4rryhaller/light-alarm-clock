@@ -32,6 +32,15 @@ void setupLed() {
   // Sin esto, analogWrite() usa el rango por defecto del core (0-1023) y los
   // valores de color 0-255 del resto del código solo llegan a ~25% de duty.
   analogWriteRange(255);
+  // El PWM software de analogWrite() en ESP8266 corre por interrupción de
+  // timer; a la frecuencia por defecto (1kHz) hay más ocasiones de colisión
+  // con otra actividad sensible a tiempos (I2C del LCD, escritura en flash de
+  // settings) — sospecha detrás de los resets con rst cause:2 vistos con el
+  // LED de dormir/despertar activo. Para una animación de color, que no
+  // necesita ni de lejos 1kHz, bajar la frecuencia reduce cuántas veces por
+  // segundo puede darse esa colisión. Si los resets persisten pese a esto,
+  // el problema no es (solo) la frecuencia del PWM.
+  analogWriteFreq(200);
   pinMode(PIN_LED_R, OUTPUT);
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);
@@ -110,4 +119,8 @@ void ledTick() {
     default:
       break;
   }
+}
+
+bool isLedEffectActive() {
+  return activeEffect != LedEffect::NONE;
 }

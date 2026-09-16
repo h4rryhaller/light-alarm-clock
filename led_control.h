@@ -23,4 +23,9 @@ void stopLed();
 // Debe llamarse en cada loop(); actualiza el PWM según el efecto activo.
 void ledTick();
 
+// true si hay un fundido o parpadeo en curso (softPWM activo en algún pin).
+// Pensado para diagnóstico: correlacionar interferencias en otros módulos
+// sensibles a temporización (p.ej. pulseIn del HC-SR04) con la actividad del LED.
+bool isLedEffectActive();
+
 #endif

@@ -92,7 +92,11 @@ void setupAlarmEngine() {
 }
 
 void startSleep() {
-  if (state != AlarmState::IDLE) return;
+  // Permite (re)arrancar el modo dormir también si ya está en SLEEP_MODE, para
+  // que un nuevo POST recoja los ajustes recién puestos por la API sin tener
+  // que llamar antes a /api/sleep/stop. Igual que ya hace un gesto durante
+  // SLEEP_MODE (ver onGesture()). Solo se bloquea si hay una alarma en curso.
+  if (state != AlarmState::IDLE && state != AlarmState::SLEEP_MODE) return;
   state = AlarmState::SLEEP_MODE;
   sleepStartMs = millis();
   setLedIntensity(settings.sleep.color, settings.sleep.startIntensity);

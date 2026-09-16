@@ -8,11 +8,13 @@
 #include "buzzer_control.h"
 #include "presence_sensor.h"
 #include "alarm_engine.h"
+#include "crash_report.h"
 
 void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("La caja — arrancando");
+  reportSavedCrash();
 
   loadSettings(settings);
 

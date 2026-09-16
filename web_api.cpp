@@ -15,6 +15,21 @@ static void sendJson(AsyncWebServerRequest *request, int code, JsonDocument &doc
   request->send(code, "application/json", body);
 }
 
+// Si el cliente declara Content-Type: application/x-www-form-urlencoded (p.ej.
+// curl -d por defecto, sin -H "Content-Type: application/json") en un PUT con
+// cuerpo JSON, ESPAsyncWebSrv nunca llama a nuestro manejador de body: mete el
+// cuerpo entero en un parámetro POST llamado "body" y no responde nada (el
+// cliente ve "empty reply", reproducible al 100%). Este helper recupera ese
+// parámetro desde el manejador de "request" (que sí se llama siempre, pase lo
+// que pase con el body) para que la API funcione sin depender de que el
+// cliente mande el Content-Type correcto. En el caso normal (Content-Type
+// correcto) el body ya se procesó en el manejador de body y no hay parámetro
+// "body" que recuperar, así que esto no hace nada.
+static void handleMisroutedBody(AsyncWebServerRequest *request, void (*apply)(AsyncWebServerRequest *, const String &)) {
+  AsyncWebParameter *p = request->getParam("body", true);
+  if (p) apply(request, p->value());
+}
+
 static void handleStatus(AsyncWebServerRequest *request) {
   JsonDocument doc;
   doc["state"] = static_cast<int>(getAlarmState());
@@ -59,17 +74,9 @@ static void handlePresenceGet(AsyncWebServerRequest *request) {
   sendJson(request, 200, doc);
 }
 
-// Acumula el body en trozos (puede llegar en varios paquetes TCP) y solo
-// parsea/aplica cuando index+len alcanza total.
-static String presencePutBody;
-
-static void handlePresencePutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-  if (index == 0) presencePutBody = "";
-  presencePutBody.concat(reinterpret_cast<const char *>(data), len);
-  if (index + len != total) return;
-
+static void applyPresenceJson(AsyncWebServerRequest *request, const String &body) {
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, presencePutBody);
+  DeserializationError err = deserializeJson(doc, body);
   if (err) {
     request->send(400, "application/json", "{\"error\":\"invalid json\"}");
     return;
@@ -81,6 +88,21 @@ static void handlePresencePutBody(AsyncWebServerRequest *request, uint8_t *data,
   saveSettings(settings);
 
   handlePresenceGet(request);
+}
+
+// Acumula el body en trozos (puede llegar en varios paquetes TCP) y solo
+// parsea/aplica cuando index+len alcanza total.
+static String presencePutBody;
+
+static void handlePresencePutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  if (index == 0) presencePutBody = "";
+  presencePutBody.concat(reinterpret_cast<const char *>(data), len);
+  if (index + len != total) return;
+  applyPresenceJson(request, presencePutBody);
+}
+
+static void handlePresencePutRequest(AsyncWebServerRequest *request) {
+  handleMisroutedBody(request, applyPresenceJson);
 }
 
 static void handleTimeGet(AsyncWebServerRequest *request) {
@@ -101,15 +123,9 @@ static void handleTimeGet(AsyncWebServerRequest *request) {
 
 // Fallback manual sin NTP: si aún no hay hora sincronizada, parte de
 // 2026-01-01 00:00:00 y aplica encima los campos que llegan en el body.
-static String timePutBody;
-
-static void handleTimePutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-  if (index == 0) timePutBody = "";
-  timePutBody.concat(reinterpret_cast<const char *>(data), len);
-  if (index + len != total) return;
-
+static void applyTimeJson(AsyncWebServerRequest *request, const String &body) {
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, timePutBody);
+  DeserializationError err = deserializeJson(doc, body);
   if (err) {
     request->send(400, "application/json", "{\"error\":\"invalid json\"}");
     return;
@@ -132,6 +148,19 @@ static void handleTimePutBody(AsyncWebServerRequest *request, uint8_t *data, siz
   handleTimeGet(request);
 }
 
+static String timePutBody;
+
+static void handleTimePutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  if (index == 0) timePutBody = "";
+  timePutBody.concat(reinterpret_cast<const char *>(data), len);
+  if (index + len != total) return;
+  applyTimeJson(request, timePutBody);
+}
+
+static void handleTimePutRequest(AsyncWebServerRequest *request) {
+  handleMisroutedBody(request, applyTimeJson);
+}
+
 static void handleAlarmGet(AsyncWebServerRequest *request) {
   JsonDocument doc;
   doc["enabled"] = settings.alarm.enabled;
@@ -140,15 +169,9 @@ static void handleAlarmGet(AsyncWebServerRequest *request) {
   sendJson(request, 200, doc);
 }
 
-static String alarmPutBody;
-
-static void handleAlarmPutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-  if (index == 0) alarmPutBody = "";
-  alarmPutBody.concat(reinterpret_cast<const char *>(data), len);
-  if (index + len != total) return;
-
+static void applyAlarmJson(AsyncWebServerRequest *request, const String &body) {
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, alarmPutBody);
+  DeserializationError err = deserializeJson(doc, body);
   if (err) {
     request->send(400, "application/json", "{\"error\":\"invalid json\"}");
     return;
@@ -162,6 +185,19 @@ static void handleAlarmPutBody(AsyncWebServerRequest *request, uint8_t *data, si
   handleAlarmGet(request);
 }
 
+static String alarmPutBody;
+
+static void handleAlarmPutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  if (index == 0) alarmPutBody = "";
+  alarmPutBody.concat(reinterpret_cast<const char *>(data), len);
+  if (index + len != total) return;
+  applyAlarmJson(request, alarmPutBody);
+}
+
+static void handleAlarmPutRequest(AsyncWebServerRequest *request) {
+  handleMisroutedBody(request, applyAlarmJson);
+}
+
 static void handleSleepGet(AsyncWebServerRequest *request) {
   JsonDocument doc;
   colorToJson(doc["color"].to<JsonObject>(), settings.sleep.color);
@@ -172,21 +208,18 @@ static void handleSleepGet(AsyncWebServerRequest *request) {
   sendJson(request, 200, doc);
 }
 
-static String sleepPutBody;
-
-static void handleSleepPutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-  if (index == 0) sleepPutBody = "";
-  sleepPutBody.concat(reinterpret_cast<const char *>(data), len);
-  if (index + len != total) return;
-
+static void applySleepJson(AsyncWebServerRequest *request, const String &body) {
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, sleepPutBody);
+  DeserializationError err = deserializeJson(doc, body);
   if (err) {
     request->send(400, "application/json", "{\"error\":\"invalid json\"}");
     return;
   }
 
-  if (doc["color"].is<JsonObjectConst>()) colorFromJson(doc["color"], settings.sleep.color);
+  // colorFromJson ya es segura sin este campo (cada r/g/b conserva su valor
+  // si no viene en el JSON, vía el operador |), igual que el resto de campos
+  // de esta misma función.
+  colorFromJson(doc["color"], settings.sleep.color);
   settings.sleep.startIntensity = doc["startIntensity"] | settings.sleep.startIntensity;
   settings.sleep.cadenceMs = doc["cadenceMs"] | settings.sleep.cadenceMs;
   settings.sleep.stepPercent = doc["stepPercent"] | settings.sleep.stepPercent;
@@ -194,6 +227,19 @@ static void handleSleepPutBody(AsyncWebServerRequest *request, uint8_t *data, si
   saveSettings(settings);
 
   handleSleepGet(request);
+}
+
+static String sleepPutBody;
+
+static void handleSleepPutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  if (index == 0) sleepPutBody = "";
+  sleepPutBody.concat(reinterpret_cast<const char *>(data), len);
+  if (index + len != total) return;
+  applySleepJson(request, sleepPutBody);
+}
+
+static void handleSleepPutRequest(AsyncWebServerRequest *request) {
+  handleMisroutedBody(request, applySleepJson);
 }
 
 static void handleWakeGet(AsyncWebServerRequest *request) {
@@ -217,21 +263,16 @@ static void handleWakeGet(AsyncWebServerRequest *request) {
   sendJson(request, 200, doc);
 }
 
-static String wakePutBody;
-
-static void handleWakePutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-  if (index == 0) wakePutBody = "";
-  wakePutBody.concat(reinterpret_cast<const char *>(data), len);
-  if (index + len != total) return;
-
+static void applyWakeJson(AsyncWebServerRequest *request, const String &body) {
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, wakePutBody);
+  DeserializationError err = deserializeJson(doc, body);
   if (err) {
     request->send(400, "application/json", "{\"error\":\"invalid json\"}");
     return;
   }
 
-  if (doc["color"].is<JsonObjectConst>()) colorFromJson(doc["color"], settings.wake.color);
+  // Mismo motivo que en applySleepJson: colorFromJson ya es segura sin este campo.
+  colorFromJson(doc["color"], settings.wake.color);
   settings.wake.cadenceMs = doc["cadenceMs"] | settings.wake.cadenceMs;
   settings.wake.stepPercent = doc["stepPercent"] | settings.wake.stepPercent;
   settings.wake.leadTimeMin = doc["leadTimeMin"] | settings.wake.leadTimeMin;
@@ -254,6 +295,19 @@ static void handleWakePutBody(AsyncWebServerRequest *request, uint8_t *data, siz
   handleWakeGet(request);
 }
 
+static String wakePutBody;
+
+static void handleWakePutBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  if (index == 0) wakePutBody = "";
+  wakePutBody.concat(reinterpret_cast<const char *>(data), len);
+  if (index + len != total) return;
+  applyWakeJson(request, wakePutBody);
+}
+
+static void handleWakePutRequest(AsyncWebServerRequest *request) {
+  handleMisroutedBody(request, applyWakeJson);
+}
+
 static void notFound(AsyncWebServerRequest *request) {
   request->send(404, "application/json", "{\"error\":\"not found\"}");
 }
@@ -267,19 +321,19 @@ void setupWebApi() {
   server.on("/api/sleep/stop", HTTP_POST, handleSleepStop);
 
   server.on("/api/presence", HTTP_GET, handlePresenceGet);
-  server.on("/api/presence", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, handlePresencePutBody);
+  server.on("/api/presence", HTTP_PUT, handlePresencePutRequest, NULL, handlePresencePutBody);
 
   server.on("/api/time", HTTP_GET, handleTimeGet);
-  server.on("/api/time", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, handleTimePutBody);
+  server.on("/api/time", HTTP_PUT, handleTimePutRequest, NULL, handleTimePutBody);
 
   server.on("/api/alarm", HTTP_GET, handleAlarmGet);
-  server.on("/api/alarm", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, handleAlarmPutBody);
+  server.on("/api/alarm", HTTP_PUT, handleAlarmPutRequest, NULL, handleAlarmPutBody);
 
   server.on("/api/sleep", HTTP_GET, handleSleepGet);
-  server.on("/api/sleep", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, handleSleepPutBody);
+  server.on("/api/sleep", HTTP_PUT, handleSleepPutRequest, NULL, handleSleepPutBody);
 
   server.on("/api/wake", HTTP_GET, handleWakeGet);
-  server.on("/api/wake", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, handleWakePutBody);
+  server.on("/api/wake", HTTP_PUT, handleWakePutRequest, NULL, handleWakePutBody);
 
   server.onNotFound(notFound);
   server.begin();

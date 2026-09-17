@@ -29,6 +29,20 @@ static unsigned long minutesToMs(uint16_t minutes) {
   return static_cast<unsigned long>(minutes) * 60000UL;
 }
 
+// cadenceMs/stepPercent fijos harían que el fundido siempre tardara lo mismo
+// (p.ej. 50 pasos x 2s = 100s) sin importar la duración deseada. Para que el
+// fundido cubra exactamente durationMs, el cadenceMs real se deriva del
+// número de pasos que exige stepPercent — no se puede lograr al revés
+// (cadenceMs fijo, stepPercent derivado) porque el paso mínimo es 1%, lo que
+// ya pone un suelo de varios minutos independiente de la duración pedida.
+static uint32_t paceCadenceMs(uint8_t startIntensity, uint8_t targetIntensity, uint8_t stepPercent, uint32_t durationMs) {
+  uint8_t span = (startIntensity > targetIntensity) ? (startIntensity - targetIntensity) : (targetIntensity - startIntensity);
+  if (stepPercent == 0) stepPercent = 1;
+  uint16_t steps = (span + stepPercent - 1) / stepPercent;
+  if (steps == 0) steps = 1;
+  return durationMs / steps;
+}
+
 static void enterIdle() {
   state = AlarmState::IDLE;
   stopLed();
@@ -50,7 +64,15 @@ static void enterWakeRamp() {
   if (wakeTargetEpoch < mktime(&nowTm)) wakeTargetEpoch += 24 * 3600;
 
   setLedIntensity(settings.wake.color, 0);
-  startFade(settings.wake.color, 100, settings.wake.cadenceMs, settings.wake.stepPercent);
+  // La subida debe llegar a 100 justo en el instante de la alarma (no a
+  // buzzLeadTimeMin: el README pide que el LED siga subiendo sin interrupción
+  // durante WAKE_BUZZ_ESCALATION, solo cambia el buzzer). Se pacea contra el
+  // tiempo real restante hasta wakeTargetEpoch en vez de leadTimeMin fijo,
+  // para que también funcione si se entra ya dentro de la ventana.
+  double rampSecs = difftime(wakeTargetEpoch, mktime(&nowTm));
+  if (rampSecs < 1) rampSecs = 1;
+  uint32_t cadenceMs = paceCadenceMs(0, 100, settings.wake.stepPercent, static_cast<uint32_t>(rampSecs * 1000.0));
+  startFade(settings.wake.color, 100, cadenceMs, settings.wake.stepPercent);
 }
 
 static void enterBuzzEscalation() {
@@ -100,7 +122,8 @@ void startSleep() {
   state = AlarmState::SLEEP_MODE;
   sleepStartMs = millis();
   setLedIntensity(settings.sleep.color, settings.sleep.startIntensity);
-  startFade(settings.sleep.color, 0, settings.sleep.cadenceMs, settings.sleep.stepPercent);
+  uint32_t cadenceMs = paceCadenceMs(settings.sleep.startIntensity, 0, settings.sleep.stepPercent, minutesToMs(settings.sleep.durationMin));
+  startFade(settings.sleep.color, 0, cadenceMs, settings.sleep.stepPercent);
 }
 
 void stopSleep() {
@@ -116,7 +139,10 @@ void onGesture() {
       // README: el gesto reinicia la función dormir.
       sleepStartMs = millis();
       setLedIntensity(settings.sleep.color, settings.sleep.startIntensity);
-      startFade(settings.sleep.color, 0, settings.sleep.cadenceMs, settings.sleep.stepPercent);
+      {
+        uint32_t cadenceMs = paceCadenceMs(settings.sleep.startIntensity, 0, settings.sleep.stepPercent, minutesToMs(settings.sleep.durationMin));
+        startFade(settings.sleep.color, 0, cadenceMs, settings.sleep.stepPercent);
+      }
       break;
     case AlarmState::ALARM_ACTIVE:
       // README: el gesto silencia el buzzer, nunca desactiva la alarma. El LED sigue.

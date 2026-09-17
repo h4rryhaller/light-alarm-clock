@@ -22,7 +22,12 @@ static unsigned long flashLastToggleMs = 0;
 static bool flashShowingA = true;
 
 static void writeColor(const RGBColor &color, uint8_t intensityPercent) {
-  float scale = intensityPercent / 100.0f;
+  // El ojo percibe el brillo de un LED de forma aprox. logarítmica, no lineal
+  // respecto al duty cycle del PWM: un fundido en % lineal se ve casi plano
+  // en el tramo alto y se "acelera" en el tramo bajo (confirmado con LDR:
+  // ver log2.txt). La corrección gamma reparte el cambio percibido de forma
+  // uniforme a lo largo de todo el fundido.
+  float scale = pow(intensityPercent / 100.0f, 2.2f);
   analogWrite(PIN_LED_R, static_cast<int>(color.r * scale));
   analogWrite(PIN_LED_G, static_cast<int>(color.g * scale));
   analogWrite(PIN_LED_B, static_cast<int>(color.b * scale));

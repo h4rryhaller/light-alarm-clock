@@ -1,0 +1,48 @@
+#
+curl -X POST http://la-caja.local/api/acknowledge
+apaga la alarma
+
+#
+curl -X POST http://la-caja.local/api/sleep/start
+a dormir
+
+#
+curl -X POST http://la-caja.local/api/sleep/stop
+cancela a dormir
+
+#
+curl GET http://la-caja.local/api/alarm
+obtiene alarma activada y hora
+
+#
+curl -X PUT http://la-caja.local/api/alarm -d '{"enabled": true, "hour": 7, "minute": 30}'
+
+
+## wake - despertador
+### GET
+curl http://la-caja.local/api/wake
+{"color":{"r":255,"g":200,"b":100},
+"cadenceMs":24000,
+"stepPercent":1,
+"leadTimeMin":60,
+"buzzLeadTimeMin":20,
+"buzzIntervalMin":5,
+"buzzBaseDurationMs":150,
+"buzzDurationIncrementMs":150,
+"buzzFrequencyHz":2000,
+"alarmColors":[
+  {"r":255,"g":0,"b":0},
+  {"r":0,"g":0,"b":255}],
+"alarmFlashCadenceMs":300,
+"alarmBuzzFrequencyHz":2500,
+"snoozeDurationMin":5,
+"maxRingDurationMin":30}%
+
+### PUT - color despertar
+curl -X PUT http://la-caja.local/api/wake -d '{"color":{"r":255,"g":200,"b":100}}'
+
+### PUT - color dormir
+curl -X PUT http://la-caja.local/api/sleep -d '{"color":{"r":255,"g":0,"b":100}}'
+
+
+

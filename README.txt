@@ -41,3 +41,17 @@ El microcontrolador ofrecerá una API para gestionar:
   - Incrementar intensidad
   - Cada cuanto tiempo se activa el buzzer si es hora (20 minutos antes de la alarma
 
+
+## TODO
+### Despertar 
+
+    Rojo/ámbar: al inicio; es suave y poco molesto.
+    Naranja: durante la transición.
+    Amarillo cálido o blanco cálido: al acercarse la hora de despertar; ayuda a activar el organismo.
+    Blanco azulado o azul intenso: mejor evitarlo al principio, porque puede resultar demasiado estimulante y deslumbrante.
+
+Configúralo para que aumente lentamente durante 20–30 minutos, con brillo moderado. Si tienes mucha dificultad para despertarte, puedes terminar con una luz blanca cálida más intensa.
+
+### Dormir
+Rojo oscuro o ámbar, naranja rojizo o rojo tenue
+20-45 minutos

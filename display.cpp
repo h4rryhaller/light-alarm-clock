@@ -21,7 +21,7 @@ static LCDBigNumbers bigNumbers(&lcd, BIG_NUMBERS_FONT_2_COLUMN_2_ROWS_VARIANT_1
 static unsigned long lastActivityMs = 0;
 static bool backlightOn = false;
 
-// Columna de arranque para centrar "HH:MM" (2+1 + 2+1 + 1 + 2+1 + 2 ≈ 13
+// Columna de arranque para centrar "HH:MM" (2+1 + 2+1 + 1 + 2+1 + rre2 ≈ 13
 // columnas de 16). Es aproximado a propósito: la librería añade un hueco de
 // separación tras cada dígito, así que el centrado exacto se ajusta a ojo.
 static const uint8_t BIG_TIME_START_COL = 1;
@@ -45,7 +45,7 @@ static uint8_t TEST_SMILEY[8] = {0x00, 0x0A, 0x0A, 0x00, 0x11, 0x0E, 0x00, 0x00}
 void setupDisplay() {
   lcd.init();
   lcd.noBacklight();
-  backlightOn = false;
+  backlightOn = false; 
 
   bigNumbers.begin();
 
